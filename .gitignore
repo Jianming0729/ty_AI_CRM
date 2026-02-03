@@ -1,0 +1,6 @@
+.DS_Store
+wecom-bridge/.env
+wecom-bridge/*.db
+wecom-bridge/node_modules/
+local-llm/__pycache__/
+*.log

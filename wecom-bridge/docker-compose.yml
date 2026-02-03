@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: chatwoot
+      POSTGRES_USER: chatwoot
+      POSTGRES_PASSWORD: chatwoot_pass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    restart: always
+
+  chatwoot:
+    image: chatwoot/chatwoot:latest
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+    env_file: .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - storage:/app/storage
+
+volumes:
+  pgdata:
+  storage:

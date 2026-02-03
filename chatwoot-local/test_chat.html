@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Chatwoot 本地测试页面</title>
+</head>
+
+<body>
+    <h1>桐叶租车智能客服 - Phase 1 测试页面</h1>
+    <p>如果配置正确，右下角将出现聊天气泡。</p>
+
+    <script>
+        window.chatwootSettings = { "position": "right", "type": "standard", "launcherTitle": "在线客服" };
+        (function (d, t) {
+            var BASE_URL = "http://localhost:3006";
+            var g = d.createElement(t), s = d.getElementsByTagName(t)[0];
+            g.src = BASE_URL + "/packs/js/sdk.js";
+            g.defer = true;
+            g.async = true;
+            s.parentNode.insertBefore(g, s);
+            g.onload = function () {
+                window.chatwootSDK.run({
+                    websiteToken: 'FF1G2WU9xCPgN3cBypwNxM1',
+                    baseUrl: BASE_URL
+                })
+            }
+        })(document, "script");
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,329 @@
+把企业微信回调/智能客服 wecom-bridge 现在就部署到同一台云服务器，走独立子域名 wecom.xytcloud.com，并且绝对不影响已正常运行的管理系统（xytcloud.com）。下面给你一套“可落地、可回滚、最少踩坑”的详细方案（偏稳、偏工程化）。
+
+目标架构（稳定、隔离、不动主站）
+
+同一台云服务器（公网 IP = 60.205.92.221） 上：
+
+现有管理系统：继续走 https://xytcloud.com（不改、不迁移、不重启）
+
+新增 wecom 入口：https://wecom.xytcloud.com → Nginx 反代 → 本机 127.0.0.1:3001（wecom-bridge）
+
+两个项目隔离方式：
+
+不同域名/不同 Nginx server block
+
+不同端口（主站原端口不动，wecom-bridge 固定 3001）
+
+不同进程/容器
+
+不同日志文件
+
+可选：用 Docker Compose 进一步隔离（推荐）
+
+0）止损与前置确认（不影响主站的关键）
+DNS（阿里云解析就够）
+
+在阿里云 DNS 里加一条记录（你已经做了）：
+
+记录类型：A
+
+主机记录：wecom
+
+记录值：60.205.92.221
+
+验证：
+
+dig +short wecom.xytcloud.com
+# 应该返回 60.205.92.221
+
+
+注意：这一点不会影响 xytcloud.com 主站。
+
+1）服务器侧准备（推荐 Docker 隔离；不改主站）
+
+下面给两条路线：
+
+方案 S（最稳推荐）：Docker Compose 跑 wecom-bridge（与主站彻底隔离）
+
+方案 P（传统）：systemd/pm2 直接跑 Node（更“裸”，也可行）
+
+我建议你直接上 方案 S。
+
+方案 S：Docker Compose（推荐）
+1.1 创建专用目录
+sudo mkdir -p /opt/wecom-bridge
+cd /opt/wecom-bridge
+
+1.2 放你的项目代码
+
+假设你现在的项目目录在仓库里（示例）：
+
+# 你可以 git clone 或 scp 上传
+# 示例：
+sudo git clone <YOUR_REPO_URL> app
+cd app
+
+1.3 写 Dockerfile（Node 服务通用模板）
+
+在 /opt/wecom-bridge/app/Dockerfile：
+
+FROM node:20-alpine
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY . .
+ENV NODE_ENV=production
+EXPOSE 3001
+
+CMD ["npm", "start"]
+
+
+如果你是 pnpm 或 yarn，我再给你对应版本；先按 npm 最通用。
+
+1.4 写 docker-compose.yml
+
+在 /opt/wecom-bridge/docker-compose.yml：
+
+services:
+  wecom-bridge:
+    build: ./app
+    container_name: wecom-bridge
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"   # 只绑定本机回环，外网无法直接打到3001
+    environment:
+      - PORT=3001
+      - WECOM_TOKEN=__REPLACE__
+      - WECOM_AES_KEY=__REPLACE__
+      - WECOM_CORP_ID=__REPLACE__
+    volumes:
+      - ./logs:/app/logs
+
+
+关键点：127.0.0.1:3001:3001
+意味着 3001 只对服务器自己可见，外部只能通过 Nginx 的 443 访问，安全且不影响其他服务。
+
+1.5 启动
+cd /opt/wecom-bridge
+sudo docker compose up -d --build
+sudo docker compose ps
+
+
+本机健康检查：
+
+curl -i http://127.0.0.1:3001/health
+
+方案 P：systemd/pm2（备选）
+
+如果你不想 Docker，我也给你最稳的 systemd 模板，但先不展开，避免你走偏；你确认不用 Docker 我再给。
+
+2）Nginx 配置（只新增一个域名，不动主站）
+2.1 新增一个独立 server block：wecom.xytcloud.com
+
+创建：
+
+sudo nano /etc/nginx/conf.d/wecom.xytcloud.com.conf
+
+
+填入（先 HTTP，用于 ACME 验证与跳转）：
+
+server {
+    listen 80;
+    server_name wecom.xytcloud.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+
+验证不影响主站：
+
+sudo nginx -t
+sudo systemctl reload nginx
+
+3）HTTPS 证书（Let’s Encrypt，单独给 wecom 子域名）
+
+这一步不会影响主站证书（除非你把主站也交给 certbot 自动改配置，所以我们只签子域名）。
+
+安装（Ubuntu/Debian）：
+
+sudo apt update
+sudo apt install -y certbot python3-certbot-nginx
+
+
+签发：
+
+sudo certbot --nginx -d wecom.xytcloud.com
+
+
+成功后，certbot会自动为该域名生成 443 配置。
+
+4）加上反向代理（只代理 wecom 子域名）
+
+编辑 /etc/nginx/conf.d/wecom.xytcloud.com.conf（或 certbot生成的 server 段里加）：
+
+server {
+    listen 443 ssl http2;
+    server_name wecom.xytcloud.com;
+
+    # certbot 会自动填 ssl_certificate / ssl_certificate_key
+
+    access_log /var/log/nginx/wecom_access.log;
+    error_log  /var/log/nginx/wecom_error.log;
+
+    # 企业微信对超时敏感：建议给短超时，避免挂死
+    proxy_connect_timeout 3s;
+    proxy_send_timeout    10s;
+    proxy_read_timeout    10s;
+
+    location /wecom/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # 如果你用 websocket（不一定需要）
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        "upgrade";
+    }
+
+    # 可选：健康检查
+    location /health {
+        proxy_pass http://127.0.0.1:3001/health;
+    }
+}
+
+
+加载：
+
+sudo nginx -t
+sudo systemctl reload nginx
+
+
+外网验证：
+
+curl -I https://wecom.xytcloud.com/health
+
+5）企业微信最容易踩的 3 个坑：签名、超时、IP 白名单（全部提前规避）
+5.1 签名校验（必过）
+
+企业微信回调 URL 校验会带参数（常见）：
+
+msg_signature
+
+timestamp
+
+nonce
+
+echostr
+
+你的 /wecom/callback 必须做到：
+
+用你在企业微信后台填的 Token + EncodingAESKey
+
+解密 echostr 或消息体
+
+返回 明文 echostr（或按要求回包）
+
+建议你在 bridge 里做两件事：
+
+回调校验阶段：只做解密→回 echostr，别做耗时业务
+
+正式消息阶段：收到消息 先快速 ack，业务异步（写队列、起线程、丢到 job）
+
+企业微信对响应时间非常敏感，通常建议 5 秒内完成，否则会重试/判失败。
+
+5.2 超时与重试（必须抗）
+
+企业微信可能重复推送同一条消息（重试机制）。
+你的 bridge 必须做：
+
+msgid / timestamp + nonce 去重
+
+“短期内重复的不处理 / 只处理一次”
+
+最稳做法：
+
+Redis 做去重 key（推荐）
+
+或本地 LRU + 持久化（次优）
+
+5.3 IP 白名单（你提到的坑）
+
+企业微信侧如果开启了 IP 白名单或安全策略，你要保证：
+
+wecom 回调入口 固定公网 IP（你服务器 IP）
+
+安全组放行：
+
+80/443（Nginx）
+
+3001 不需要公网放行（我们绑定 127.0.0.1 了）
+
+安全组建议：
+
+入站允许：TCP 80, 443（0.0.0.0/0）
+
+禁止：TCP 3001（不开放即可）
+
+6）不影响主站的“上线策略”与“回滚策略”（你要的稳定闭环）
+上线策略（零影响主站）
+
+先上 Docker/wecom-bridge，仅监听 127.0.0.1:3001
+
+先上 wecom.xytcloud.com 的 Nginx（不改 xytcloud.com 的任何配置）
+
+证书签发、health 检测 OK
+
+再去企业微信后台填：
+https://wecom.xytcloud.com/wecom/callback
+
+回滚策略（10 秒止损）
+
+如果企业微信验证/回调炸了：
+
+只需要把 wecom 子域名的 Nginx 配置禁用/改回 503，不动主站
+
+例如临时返回 503：
+
+location /wecom/ { return 503; }
+
+
+或者直接停止容器（不影响主站）：
+
+cd /opt/wecom-bridge
+sudo docker compose down
+
+7）你现在立刻能做的“最小闭环检查清单”
+
+在你去企业微信点“保存/验证”之前，先保证：
+
+DNS 解析正确
+
+dig +short wecom.xytcloud.com
+
+
+HTTPS 可访问
+
+curl -I https://wecom.xytcloud.com/health
+
+
+Nginx 能打到本机 bridge
+
+curl -i https://wecom.xytcloud.com/wecom/ping
+# 你可以在bridge里写个ping接口快速验证
+
+
+Nginx 日志能看到请求
+
+tail -f /var/log/nginx/wecom_access.log

@@ -1,0 +1,14 @@
+{
+  "gateway": {
+    "port": 18789,
+    "token": "YOUR_GATEWAY_TOKEN_HERE"
+  },
+  "providers": [
+    {
+      "id": "local-mock",
+      "type": "openai",
+      "baseUrl": "http://localhost:8000/v1",
+      "apiKey": "mock-key"
+    }
+  ]
+}

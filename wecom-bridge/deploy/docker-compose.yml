@@ -1,0 +1,29 @@
+services:
+  wecom-bridge:
+    build: ./app
+    container_name: wecom-bridge
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    environment:
+      - PORT=3001
+      - WECOM_TOKEN=${WECOM_TOKEN}
+      - WECOM_AES_KEY=${WECOM_AES_KEY}
+      - WECOM_CORP_ID=${WECOM_CORP_ID}
+      - OPENCLAW_GATEWAY_URL=http://mock-provider:8000
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+    volumes:
+      - ./logs:/app/logs
+      - ./wecom_bridge.db:/app/wecom_bridge.db
+      - ./app/knowledge_base.json:/app/knowledge_base.json
+
+  mock-provider:
+    image: python:3.12-slim
+    container_name: mock-provider
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: sh -c "pip install -i https://pypi.tuna.tsinghua.edu.cn/simple flask flask-cors && python local-llm/mock_provider.py"

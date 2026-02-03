@@ -1,0 +1,7 @@
+services:
+  mock-llm:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - FLASK_ENV=development

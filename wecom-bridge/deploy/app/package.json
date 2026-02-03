@@ -1,0 +1,20 @@
+{
+  "name": "wecom-bridge",
+  "version": "1.0.0",
+  "description": "负责对接企业微信回调，处理加解密、消息幂等，并转发给 OpenClaw Gateway。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@wecom/crypto": "^1.0.1",
+    "axios": "^1.13.4",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "sqlite3": "^5.1.7",
+    "xml2js": "^0.6.2"
+  }
+}
