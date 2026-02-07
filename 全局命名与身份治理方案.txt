@@ -1,0 +1,169 @@
+下面是一份综合本 session 全部讨论后形成的「最终版 · 全局命名与身份治理方案」。
+这不是概念说明，而是可直接写入工程治理文档 / README / 架构规范的定稿版本，目标规模 10W+（可平滑扩展到百万级），并且彻底消灭 user / contact / agent 的歧义。
+
+Tongye × Chatwoot
+全局命名与身份治理方案（Final）
+一、核心设计原则（先立法）
+1️⃣ 单一事实源（SSOT）
+
+任何“物理人”在系统中的唯一身份 = ty_uid
+
+ty_uid 终身不变、跨系统、跨渠道、跨时间
+
+2️⃣ Chatwoot ≠ 业务中枢
+
+Chatwoot 是 CRM / 对话工作台
+
+Tongye 是业务身份与编号的唯一主权方
+
+Chatwoot 里的 ID（User ID / Contact ID）永远不作为业务身份
+
+3️⃣ user 这个词必须“拆解”
+
+禁止使用裸的 user / user_id
+
+所有身份必须显式指明“在哪个域、扮演什么角色”
+
+二、身份三层模型（不可混用）
+Layer 1｜机器唯一身份（永不展示给人）
+字段	示例	说明
+ty_uid	TYU_01KGJNCQ6FN4J26KGGHANWQ1T0	全局唯一、SSOT、唯一可信身份
+Layer 2｜业务身份类型（治理核心）
+
+一个人只有一个 ty_uid，但在不同场景下有不同 actor_type
+
+actor_type	含义	说明
+agent	Chatwoot 坐席 / 管理员	仅限被授予 Agent 席位的人
+employee	内部员工（非坐席）	可能出现在 Contact 中
+customer	外部租车客户	默认类型
+partner	供应商 / 合作方	可扩展
+
+⚠️ 是否 Agent 只取决于是否被授予 Chatwoot Agent 权限
+没有席位 → 一律不是 agent
+
+Layer 3｜人类可读显示代号（强烈推荐）
+统一格式
+{PREFIX}-{SEQUENCE}
+
+
+固定宽度：6 位数字（支持 10W+，可扩展）
+
+由 Tongye 业务中枢统一分配
+
+仅用于 人类辨识 / UI / 运营
+
+Prefix 规范（最终定稿）
+Prefix	actor_type	含义
+A-000001	agent	Chatwoot 坐席 / 管理员
+E-000001	employee	内部员工（非坐席）
+U-000001	customer	外部客户（默认）
+P-000001	partner	供应商 / 合作方
+
+说明
+
+不是 Agent 的人，绝不使用 A- 前缀
+
+Chatwoot Contact 中允许同时存在 U- / E- / P-
+
+三、Chatwoot 视角的严格定义（防混淆）
+1️⃣ Chatwoot User
+
+含义：能登录 Chatwoot 的坐席 / 管理员
+
+业务身份：actor_type = agent
+
+显示名规范：
+
+A-000123 | Jianming Wang
+
+2️⃣ Chatwoot Contact
+
+含义：所有“对话对象”的容器
+
+可能身份：
+
+外部客户（U-）
+
+内部员工（E-）
+
+供应商（P-）
+
+显示名规范（强制）：
+
+U-000345 | QiXi
+E-000078 | 王五
+P-000012 | 某某供应商
+
+
+⚠️ Contact ≠ Customer
+Contact 是容器，Customer 是业务身份
+
+四、字段与命名强约束（工程级）
+🚫 禁止使用的字段名
+
+user
+
+user_id
+
+uid（不带前缀）
+
+✅ 允许 / 必须使用的字段名
+字段名	含义
+ty_uid	全局唯一身份
+actor_type	agent / employee / customer / partner
+handle	A-000123 / U-000456
+cw_agent_id	Chatwoot User ID
+cw_contact_id	Chatwoot Contact ID
+五、Chatwoot × Tongye 映射规则（运行时）
+1️⃣ 入站消息（WeCom / Web / 电话）
+resolve_or_create_identity →
+  ty_uid
+  actor_type（默认 customer）
+  handle（U-xxxxxx）
+
+2️⃣ 同步写入 Chatwoot Contact
+
+display_name：U-000123 | 当前昵称
+
+custom_attributes：
+
+ty_uid
+
+handle
+
+actor_type
+
+source_channel
+
+3️⃣ 私有便笺（强制）
+[Identity Linked]
+handle=U-000123
+ty_uid=TYU_01KG...
+actor_type=customer
+
+六、身份升级与变更规则（不改 ty_uid）
+场景	允许操作	禁止操作
+客户 → 员工	U- → E-	❌ 新建 ty_uid
+员工 → Agent	E- → A-	❌ 复用 Chatwoot User ID 作为业务 ID
+改名 / 改昵称	修改 display_name	❌ 修改 ty_uid
+七、10W+ 规模下的编号治理
+
+编号来源：Tongye 中枢
+
+不依赖 Chatwoot 自增 ID
+
+可迁移、可多实例、可跨区域
+
+handle ≠ 主键，只是“可读锚点”
+
+八、最终一句话定义（可直接写进治理白皮书）
+
+在 Chatwoot：只有被授予席位的人才是 Agent（A-）；所有其他对话对象一律是 Contact，并通过 Tongye 的 handle（U-/E-/P-）区分真实业务身份；系统内唯一可信身份永远是 ty_uid。
+
+如果你愿意，下一步我可以直接帮你做三件事之一（任选）：
+
+1️⃣ 把这套规则 落成 Postgres 表结构（含 sequence 分配器）
+2️⃣ 按此规范 重写 resolve_or_create / merge / link 接口定义
+3️⃣ 给 Chatwoot 做一个 右侧 Identity Panel（固定显示 handle + actor_type）
+
+这套方案已经是工程级终态设计，后面不会再推翻，只会扩展。

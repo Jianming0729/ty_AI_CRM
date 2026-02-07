@@ -1,0 +1,332 @@
+按“100W+ 用户规模 + 智能营销 + 长期身份持久化”的标准，把你现在的 Chatwoot↔企微↔AI 体系，升级成一个全局身份与会话中枢（不会再被昵称/标签/旧 source_id 污染拖垮）。
+
+下面这套方案的目标是：
+
+任何用户：无论隔多久回来、换昵称/头像/标签、换员工对接、换入口（群聊/单聊/不同应用）
+→ 都能通过唯一键被识别
+
+必要时可做微信侧验证（UnionID/OpenID/手机号验证等）
+→ 把“临时锚点”升级为“权威锚点”
+
+支撑 100W+ 用户、智能营销、分群、触达、归因、风控、审计
+
+不改 Chatwoot 源码：Chatwoot 只是“客服 UI”；真正的身份真相在你自己的数据库里
+
+0. 总体架构：把“身份”从 Chatwoot / Bridge 里剥离出来
+你需要新增一个核心域：Identity & Profile Service（身份与档案服务）
+
+它是全局唯一真相源（SSOT），负责：
+
+生成并持久化桐叶用户唯一键：ty_uid
+
+维护外部身份映射（企微/微信/手机号/邮件等）
+
+给 Chatwoot / AI / 营销系统提供统一的用户识别、合并、验证、风控接口
+
+Chatwoot 的 contact_id / source_id 不再是主键，只是“外部系统引用”。
+
+1) 核心唯一键设计：ty_uid（永久不变）
+ty_uid 必须满足
+
+全局唯一（跨城市/门店/多系统）
+
+不可猜测（避免泄露规模）
+
+可排序/可分片（便于数据分库分表、审计）
+
+生成稳定（不会因外部变化改变）
+
+推荐格式
+
+ty_uid = ULID/UUIDv7（优先 ULID，天然时间有序）
+
+示例：TYU_01J2F6...
+
+100W 只是开始，你未来 1 亿也不改规则。
+
+2) 外部身份锚点：分“弱锚点”与“强锚点”
+
+你现在最大的坑就是“锚点漂移”。解决方式是分级锚点：
+
+A. 弱锚点（不保证长期不变，但用于初次识别）
+
+企微外部联系人：external_userid（大多数情况下非常稳定）
+
+会话来源：chat_id / room_id / staff_id（上下文辅助）
+
+昵称、头像、标签：只能当属性，不可当 key
+
+B. 强锚点（权威、可验证、适合长期唯一识别）
+
+微信生态：unionid（跨应用唯一，最强）
+
+微信公众号/小程序：openid（同一应用内强）
+
+手机号（通过短信 OTP 或微信绑定验证后成为强锚点）
+
+身份证/驾照等（业务允许才做，且必须合规加密/脱敏）
+
+你的策略应是：先用 external_userid 快速落库建档，再通过验证把用户升级到 unionid/手机号等强锚点。
+
+3) 必须创建“专用数据库”：建议用 PostgreSQL + Redis + 可选消息队列
+数据层建议
+
+PostgreSQL（主库）：身份、映射、用户档案、营销分群、事件索引
+
+Redis（缓存/会话态）：会话接管状态、短期去重、限流、风控计数器
+
+消息队列（建议上）：Kafka / RabbitMQ / Redis Streams
+用于：消息事件、用户行为、营销触达、异步写入、审计流水
+
+100W 用户 + 智能营销，一定会走向事件驱动。否则你后面会被“同步链路”拖死。
+
+4) 数据模型（最小可扩展版本）
+4.1 用户主表：users
+
+ty_uid（PK）
+
+tenant_id（将来多公司/多业务线必备）
+
+status（active/blocked/merged）
+
+created_at / updated_at
+
+4.2 外部身份映射表：identities（核心）
+
+id（PK）
+
+ty_uid（FK）
+
+provider（wecom/wechat/phone/email/chatwoot…）
+
+external_key（比如 external_userid / unionid / phone）
+
+key_hash（建议存 hash + 原值加密存储可选）
+
+is_verified（是否已验证成为强锚点）
+
+verified_at
+
+metadata（json：来源员工、渠道、首次来源等）
+
+created_at
+
+唯一约束：
+UNIQUE(provider, external_key)
+保证一个外部身份只能绑定一个 ty_uid（除非走 merge 流程）。
+
+4.3 Chatwoot 绑定表：chatwoot_links
+
+ty_uid
+
+chatwoot_account_id
+
+chatwoot_inbox_id
+
+chatwoot_contact_id
+
+chatwoot_contact_inbox_id
+
+last_conversation_id（可选缓存）
+
+4.4 用户画像表：profiles（可拆分）
+
+ty_uid
+
+display_name（可变）
+
+tags（可变）
+
+city/store（可变）
+
+marketing_consent（合规）
+
+attributes（json）
+
+4.5 事件表：user_events（营销与审计的根）
+
+event_id（ULID）
+
+ty_uid
+
+event_type（message_in/message_out/order_created/…）
+
+source（wecom/chatwoot/openclaw）
+
+payload（json）
+
+occurred_at
+
+这张表是你未来“智能营销/归因/漏斗/推荐系统”的起点。
+
+5) 统一识别流程（关键：永远先过 Identity Service）
+5.1 企微消息入站（用户→系统）
+
+Bridge 收到企微 webhook
+
+提取候选锚点：external_userid（优先）
+
+调用 Identity Service：
+
+resolve_or_create(provider=wecom, external_key=external_userid)
+
+返回：ty_uid + identity_level(weak/strong)
+
+后续所有动作（写 Chatwoot、AI 回复、存事件、营销归因）都用 ty_uid
+
+5.2 写入 Chatwoot（只做展示+人工接管）
+
+Chatwoot 的 source_id 必须固定为：
+source_id = "ty:" + ty_uid
+
+这样即便 Chatwoot 里曾经有脏 external_userid，也不会再污染你的身份层。
+
+这一步是“终极止血”：Chatwoot 不再当身份源。
+
+5.3 Chatwoot 回复出站（人工→用户）
+
+Chatwoot webhook 推来 outgoing message
+
+Bridge 解析 payload 得到 source_id（你会拿到 ty:TYU_...）
+
+用 source_id 反查 ty_uid
+
+再用 identities 表找“当前可达渠道”：
+
+优先 wecom external_userid
+
+或按用户绑定的微信/手机号选择
+
+投递到对应渠道
+
+6) “必要时对接微信验证，正式导入唯一键”的设计
+
+这件事的专业做法叫：Identity Upgrade（身份升级） + Account Linking（账号绑定）
+
+你可以提供两种升级路径
+路径 A：微信 OAuth（推荐）
+
+用户点击“验证身份/绑定账号”
+
+走公众号/小程序 OAuth
+
+拿到 unionid（强锚点）
+
+写入 identities：provider=wechat, external_key=unionid, is_verified=true
+
+若 unionid 已绑定其他 ty_uid → 触发 Merge 合并流程
+
+路径 B：手机号 OTP（可选）
+
+用户提供手机号
+
+短信验证码验证
+
+phone 成为 verified identity
+
+同样支持合并
+
+最终效果：用户就算换企微 external_userid（极端情况），也能通过 unionid/手机号找回同一 ty_uid。
+
+7) 合并与“脏数据治理”：必须内置 Merge 流程（否则迟早炸）
+
+100W 用户一定会出现：
+
+同人多号
+
+旧数据错误绑定
+
+员工误操作
+
+测试数据残留
+
+所以你必须有一个 Merge Service：
+
+Merge 原则
+
+以强锚点（unionid/verified phone）为准
+
+只允许“合并到主 ty_uid”，被合并者标记 status=merged
+
+所有关联（chatwoot_links、profiles、events）做归并或建立 alias
+
+必备表：user_alias
+
+alias_uid → primary_uid
+
+用于任何历史记录回溯、避免丢失旧引用
+
+8) 接管状态与“AI/人工发送判定”（你前面提到的痛点）
+
+你已经在做 HUMAN_MODE/AI_MODE 了，但未来要做成“可运营”的能力：
+
+建议规则
+
+conversation_mode 存 Redis（实时）+ Postgres（持久）
+
+触发方式：
+
+Chatwoot assign / tag = human → HUMAN_MODE（TTL 可选）
+
+超时无人回复 → 自动回 AI_MODE
+
+风控/投诉关键词 → 强制 HUMAN_MODE
+
+发送路由
+
+AI_MODE：AI 只在企微发；Chatwoot只记录（incoming/outgoing 都写成“系统日志类”）
+
+HUMAN_MODE：Chatwoot outgoing 必须转发企微；AI 禁止直接回复或仅写 private note 建议
+
+9) 性能与扩展（100W+ 的工程底线）
+必须做到的工程策略
+
+所有外部 webhook（企微/Chatwoot）先 ACK 后入队（异步处理）
+
+Identity Service 查询必须可缓存：
+
+provider+external_key -> ty_uid 放 Redis（TTL 可长）
+
+Postgres 必须索引：
+
+(provider, external_key)
+
+ty_uid
+
+事件表按时间分区（按月/周），便于营销分析与归档
+
+最终一致性：允许“先显示后补全”（客服系统可接受）
+
+10) 最终你将得到的“全局系统性能力清单”
+
+✅ 永久唯一 ty_uid
+
+✅ 外部身份多源绑定（wecom/wechat/phone）
+
+✅ 强锚点验证升级（unionid/OTP）
+
+✅ Chatwoot 只做 UI，不再污染身份
+
+✅ AI/人工接管路由可控
+
+✅ 营销可做分群、归因、触达、频控
+
+✅ 合并/回溯/审计可闭环
+
+✅ 100W+ 可扩展（事件驱动 + 缓存 + 分区）
+
+你现在最应该立刻落地的三件事（高收益）
+
+统一 Chatwoot source_id = ty:${ty_uid}（彻底终结脏 source_id 回潮）
+
+建 identity_map（identities 表）：wecom external_userid -> ty_uid
+
+准备身份升级入口：微信 OAuth 拿 unionid（先把框架留好）
+
+如果你同意，我下一条可以直接给你输出两份“可交给编辑器执行”的硬交付物（不需要你再解释）：
+
+数据库建表 SQL（Postgres）：users / identities / chatwoot_links / events / alias
+
+服务接口规范（REST）：resolve_or_create、link_identity、merge_users、resolve_delivery_target
+
+这样你就能从“能跑”升级到“能规模化运营”。

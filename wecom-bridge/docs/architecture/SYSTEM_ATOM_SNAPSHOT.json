@@ -1,0 +1,64 @@
+{
+    "system_id": "wecom-bridge",
+    "version": "1.0.0",
+    "architecture_version": "2.1.0",
+    "ssot_database": "ty_identity (PostgreSQL)",
+    "local_state": "wecom_bridge.db (SQLite)",
+    "governance_laws": [
+        "Identity sovereignty only in Postgres",
+        "Chatwoot is purely UI",
+        "Schema version must match exactly on boot",
+        "Profiles are mandatory for URL injection",
+        "Governance tests are non-negotiable"
+    ],
+    "db_schema_pg": {
+        "system_meta": [
+            "schema_version",
+            "min_bridge_version"
+        ],
+        "users": [
+            "ty_uid",
+            "actor_type",
+            "handle",
+            "status"
+        ],
+        "identities": [
+            "ty_uid",
+            "provider",
+            "external_key",
+            "metadata"
+        ],
+        "chatwoot_links": [
+            "ty_uid",
+            "contact_id",
+            "last_conversation_id"
+        ]
+    },
+    "db_schema_sqlite": {
+        "local_meta": [
+            "schema_version"
+        ],
+        "conversation_state": [
+            "source_id",
+            "mode"
+        ],
+        "msg_dedup": [
+            "msg_id",
+            "timestamp"
+        ],
+        "audit_log": [
+            "user_id",
+            "query",
+            "intent",
+            "response"
+        ]
+    },
+    "active_profiles": [
+        "prod_global",
+        "prod_cn_direct",
+        "prod_cn_vpn",
+        "dev_local"
+    ],
+    "identity_format": "ROLE-SEQ (e.g., U-000001, A-000002)",
+    "deduplication_method": "ULID + Store-based hashing"
+}

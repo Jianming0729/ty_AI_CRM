@@ -10,11 +10,12 @@ echo "🚀 开始准备部署文件..."
 # 确保 build 依赖排除
 # 创建临时目录
 mkdir -p ./deploy/app
-cp -r src package.json package-lock.json Dockerfile Dockerfile.gateway .env ./deploy/app/
+cp -r src config package.json package-lock.json Dockerfile Dockerfile.gateway .env ./deploy/app/
 cp knowledge_base.json ./deploy/app/
 mkdir -p ./deploy/local-llm
 cp ../local-llm/mock_provider.py ./deploy/local-llm/
-cp docker-compose.yml .env ./deploy/
+cp docker-compose.yml .env README.md ./deploy/
+cp -r docs ./deploy/
 cp deploy/nginx.conf ./deploy/
 
 echo "📦 正在同步到服务器 ${SERVER_IP}..."

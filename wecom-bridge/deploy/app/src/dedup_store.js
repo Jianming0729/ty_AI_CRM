@@ -12,6 +12,13 @@ db.serialize(() => {
     )`);
     db.run(`CREATE INDEX IF NOT EXISTS idx_timestamp ON msg_dedup(timestamp)`);
 
+    // 新增：出站消息去重表 (Chatwoot -> WeCom)
+    // 防止 Bridge 同步给 Chatwoot 的消息被 Webhook 再次抓取形成环路
+    db.run(`CREATE TABLE IF NOT EXISTS outbound_dedup (
+        cw_msg_id INTEGER PRIMARY KEY,
+        timestamp INTEGER
+    )`);
+
     // 新增：审计日志表
     db.run(`CREATE TABLE IF NOT EXISTS audit_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,6 +67,27 @@ module.exports = {
             const expiry = now - TTL;
             db.run("DELETE FROM msg_dedup WHERE timestamp < ?", [expiry]);
         }
+    },
+
+    /**
+     * 标记出站消息已处理
+     */
+    markOutboundProcessed: (cwMsgId) => {
+        if (!cwMsgId) return;
+        const now = Math.floor(Date.now() / 1000);
+        db.run("INSERT OR IGNORE INTO outbound_dedup (cw_msg_id, timestamp) VALUES (?, ?)", [cwMsgId, now]);
+    },
+
+    /**
+     * 检查出站消息是否为 Bridge 产生的（防环路）
+     */
+    isOutboundDuplicate: (cwMsgId) => {
+        return new Promise((resolve) => {
+            if (!cwMsgId) return resolve(false);
+            db.get("SELECT cw_msg_id FROM outbound_dedup WHERE cw_msg_id = ?", [cwMsgId], (err, row) => {
+                resolve(!!row);
+            });
+        });
     },
 
     /**
