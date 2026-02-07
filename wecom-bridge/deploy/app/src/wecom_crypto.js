@@ -48,6 +48,7 @@ module.exports = {
             throw new Error('Decryption failed');
         }
         console.log('[Crypto] Decryption success, parsing interior XML');
+        console.log('[Crypto] RAW Decrypted XML:', message.toString());
         return parser.parseStringPromise(message.toString());
     },
 

@@ -1,105 +1,28 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const processed = new Set();
+const inProgress = new Set();
 
-const dbPath = path.join(__dirname, '../wecom_bridge.db');
-const db = new sqlite3.Database(dbPath);
-
-// 初始化数据库
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS msg_dedup (
-        msg_id TEXT PRIMARY KEY,
-        timestamp INTEGER
-    )`);
-    db.run(`CREATE INDEX IF NOT EXISTS idx_timestamp ON msg_dedup(timestamp)`);
-
-    // 新增：出站消息去重表 (Chatwoot -> WeCom)
-    // 防止 Bridge 同步给 Chatwoot 的消息被 Webhook 再次抓取形成环路
-    db.run(`CREATE TABLE IF NOT EXISTS outbound_dedup (
-        cw_msg_id INTEGER PRIMARY KEY,
-        timestamp INTEGER
-    )`);
-
-    // 新增：审计日志表
-    db.run(`CREATE TABLE IF NOT EXISTS audit_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT,
-        query TEXT,
-        intent TEXT,
-        response TEXT,
-        msg_id TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-});
-
-const TTL = 3600; // 1小时 (秒)
+// 每小时清理一次，防止内存无限增长
+setInterval(() => {
+    processed.clear();
+    inProgress.clear();
+}, 3600000);
 
 module.exports = {
     /**
-     * 检查是否重复 (Promise 版)
+     * 原子级检查并加锁，解决并发竞争导致的重复入库
      */
-    isDuplicate: (msgId) => {
-        return new Promise((resolve, reject) => {
-            if (!msgId) return resolve(false);
-
-            db.get("SELECT msg_id FROM msg_dedup WHERE msg_id = ?", [msgId], (err, row) => {
-                if (err) return reject(err);
-                if (row) {
-                    console.log(`[Dedup] Duplicate found in DB: ${msgId}`);
-                    return resolve(true);
-                }
-                resolve(false);
-            });
-        });
+    acquireLock: (msgId) => {
+        if (processed.has(msgId) || inProgress.has(msgId)) return false;
+        inProgress.add(msgId);
+        return true;
     },
 
-    /**
-     * 标记已处理
-     */
+    releaseLock: (msgId) => {
+        inProgress.delete(msgId);
+    },
+
     markProcessed: (msgId) => {
-        if (!msgId) return;
-        const now = Math.floor(Date.now() / 1000);
-        db.run("INSERT OR IGNORE INTO msg_dedup (msg_id, timestamp) VALUES (?, ?)", [msgId, now], (err) => {
-            if (err) console.error('[Dedup] DB Insert Error:', err.message);
-        });
-
-        // 定期清理过期记录 (10% 概率触发)
-        if (Math.random() < 0.1) {
-            const expiry = now - TTL;
-            db.run("DELETE FROM msg_dedup WHERE timestamp < ?", [expiry]);
-        }
-    },
-
-    /**
-     * 标记出站消息已处理
-     */
-    markOutboundProcessed: (cwMsgId) => {
-        if (!cwMsgId) return;
-        const now = Math.floor(Date.now() / 1000);
-        db.run("INSERT OR IGNORE INTO outbound_dedup (cw_msg_id, timestamp) VALUES (?, ?)", [cwMsgId, now]);
-    },
-
-    /**
-     * 检查出站消息是否为 Bridge 产生的（防环路）
-     */
-    isOutboundDuplicate: (cwMsgId) => {
-        return new Promise((resolve) => {
-            if (!cwMsgId) return resolve(false);
-            db.get("SELECT cw_msg_id FROM outbound_dedup WHERE cw_msg_id = ?", [cwMsgId], (err, row) => {
-                resolve(!!row);
-            });
-        });
-    },
-
-    /**
-     * 审计留痕
-     */
-    logInteraction: (userId, query, intent, response, msgId) => {
-        db.run(
-            "INSERT INTO audit_log (user_id, query, intent, response, msg_id) VALUES (?, ?, ?, ?, ?)",
-            [userId, query, intent, response, msgId],
-            (err) => {
-                if (err) console.error('[Audit] DB Log Error:', err.message);
-            }
-        );
+        inProgress.delete(msgId);
+        processed.add(msgId);
     }
 };

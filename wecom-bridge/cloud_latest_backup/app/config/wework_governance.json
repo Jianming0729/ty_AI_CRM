@@ -1,0 +1,16 @@
+{
+  "governance_version": "1.0",
+  "description": "Tongye WeCom Customer Service Governance - Source of Truth",
+  "kf_accounts": {
+    "wkKkXdJgAADYkAWa75OYqvUij1lGvpyg": {
+      "name": "桐叶租车智能客服",
+      "servicers": [],
+      "expected_callback_url": "https://wecom.xytcloud.com/callback"
+    }
+  },
+  "global_settings": {
+    "auto_reconcile_interval_ms": 3600000,
+    "degradation_error_threshold": 5,
+    "silence_threshold_sec": 600
+  }
+}
