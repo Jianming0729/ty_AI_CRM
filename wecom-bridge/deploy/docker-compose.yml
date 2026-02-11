@@ -10,6 +10,8 @@ services:
       - chatwoot_default
       - default
     volumes:
+      - ./.env:/app/.env:ro
+      - ./app/config/profiles:/app/config/profiles:rw
       - ./logs:/app/logs
       - ./wecom_bridge.db:/app/wecom_bridge.db
       - ./app/knowledge_base.json:/app/knowledge_base.json

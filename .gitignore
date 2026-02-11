@@ -1,4 +1,5 @@
-.DS_Store
+.env
+*.env
 wecom-bridge/.env
 wecom-bridge/*.db
 wecom-bridge/node_modules/

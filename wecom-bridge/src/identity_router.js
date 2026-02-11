@@ -125,4 +125,33 @@ router.get('/chatwoot/link', async (req, res) => {
     }
 });
 
+/**
+ * (G) 根据 Chatwoot Contact ID 反查 ty_uid
+ */
+router.get('/chatwoot/resolve-by-contact', async (req, res) => {
+    try {
+        const { contact_id } = req.query;
+        if (!contact_id) {
+            return res.status(400).json({ error: 'contact_id is required' });
+        }
+
+        const result = await identityService.resolveByChatwootContactId(contact_id);
+        if (!result) {
+            if (process.env.MOCK_MODE === 'true') {
+                logger.info(`[Identity-Mock] Bypassing 404 for Contact ${contact_id} in Mock Mode`);
+                return res.status(200).json({ ty_uid: 'U-MOCK' });
+            }
+            return res.status(404).json({ error: 'Mapping not found' });
+        }
+        res.status(200).json(result);
+    } catch (error) {
+        if (process.env.MOCK_MODE === 'true') {
+            logger.warn(`[Identity-Mock] Recovering from FATAL with Mock UID for Contact ${req.query.contact_id}: ${error.message}`);
+            return res.status(200).json({ ty_uid: 'U-MOCK' });
+        }
+        logger.error(`[API] resolve-by-contact failed: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

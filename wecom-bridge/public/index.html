@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ty_AI_CRM | 智能管理门户</title>
+    <link rel="stylesheet" href="style.css?v=20260209-1">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Inter:wght@400;700&display=swap"
+        rel="stylesheet">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+</head>
+
+<body>
+    <div class="background-overlay"></div>
+
+    <main class="container">
+        <div class="glass-card portal-mode">
+            <header>
+                <div class="logo">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#grad1)" />
+                        <path d="M2 17L12 22L22 17" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        <path d="M2 12L12 17L22 12" stroke="url(#grad1)" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        <defs>
+                            <linearGradient id="grad1" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#00f2fe" />
+                                <stop offset="1" stop-color="#4facfe" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <h1>ty_AI_CRM</h1>
+                </div>
+                <p class="subtitle">AI 智能代驾客服与多租户管理系统</p>
+            </header>
+
+            <section class="portal-main">
+                <div class="status-badge">
+                    <span class="pulse"></span>
+                    系统服务运行正常
+                </div>
+
+                <div class="welcome-text">
+                    <h2>欢迎回来</h2>
+                    <p>点击下方按钮安全授权并进入智能管理后台</p>
+                </div>
+
+                <div class="action-area">
+                    <div class="agreement-box">
+                        <input type="checkbox" id="agree" checked>
+                        <label for="agree">
+                            我已阅读并同意
+                            <a href="/privacy" target="_blank">《隐私政策》</a> 和
+                            <a href="/terms" target="_blank">《第三方服务协议》</a>
+                        </label>
+                    </div>
+
+                    <button id="enterBtn" class="btn-primary pulse-btn">
+                        <span>立即进入管理后台</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12H19M19 12L12 5M19 12L12 19" />
+                        </svg>
+                    </button>
+
+                    <div class="secondary-actions">
+                        <a href="/c360.html" class="link-btn">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                                <circle cx="9" cy="7" r="4" />
+                                <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                            </svg>
+                            <span>查看客户全景 (Customer 360)</span>
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            <footer>
+                <p class="copyright">© 2026 通用全栈 (Tongye Fullstack). All Rights Reserved.</p>
+            </footer>
+        </div>
+    </main>
+
+    <script>
+        const btn = document.getElementById('enterBtn');
+        const agree = document.getElementById('agree');
+
+        btn.addEventListener('click', function () {
+            if (!agree.checked) {
+                alert('请先阅读并勾选隐私政策和服务协议');
+                return;
+            }
+            // 立即开启加载动画
+            btn.classList.add('loading');
+            btn.innerHTML = '<span>正在安全连接...</span>';
+
+            // 执行单点跳转
+            setTimeout(() => {
+                window.location.href = '/portal/chatwoot';
+            }, 500);
+        });
+    </script>
+</body>
+
+</html>

@@ -5,3 +5,5 @@ node_modules/
 .env
 debug_*.js
 *.log
+config/profiles/*.env
+!config/profiles/*.env.example

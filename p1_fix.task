@@ -1,0 +1,13 @@
+{
+  "name": "P1-Identity-Router-Mounting",
+  "goal": "修复 identity_router.js 未挂载漏洞并实现 Customer 360 聚合逻辑",
+  "steps": [
+    "读取 wecom-bridge/src/server.js，在 140 行后挂载 identity_router.js 到 /api/identity/v1 路径。",
+    "在 src/services/customer360/ 实现聚合逻辑，通过 ReadOnlyMaintenanceAdapter.js 获取维修数据。",
+    "代码自检：禁止任何 POST/PUT 逻辑，确保 100% 只读安全性。"
+  ],
+  "constraints": {
+    "max_retries": 3,
+    "security_level": "L3-Sandbox"
+  }
+}

@@ -9,7 +9,15 @@ const pool = new Pool({
     database: process.env.PG_DATABASE || 'ty_identity',
     max: 20,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    connectionTimeoutMillis: 30000,
+});
+
+pool.on('connect', () => {
+    console.log(`[PG-Pool] New client connected to ${process.env.PG_DATABASE || 'ty_identity'}`);
+});
+
+pool.on('error', (err) => {
+    console.error('[PG-Pool] Unexpected error on idle client', err.message);
 });
 
 /**

@@ -1,20 +1,19 @@
+// --- 🛰️ Architecture Circuit Breaker ---
+require('./bootstrap')();
+
 const axios = require('axios');
-const path = require('path');
-const fs = require('fs');
 
 async function run() {
-    require('dotenv').config({ path: path.join(__dirname, '../.env') });
-    const profile = process.env.PROFILE || 'prod_global';
-    const profilePath = path.join(__dirname, `../config/profiles/${profile}.env`);
-    if (fs.existsSync(profilePath)) {
-        const config = require('dotenv').parse(fs.readFileSync(profilePath));
-        for (const k in config) process.env[k] = config[k];
-    }
+    console.log("🚀 Starting diagnose_95018 with V3 Configuration...");
 
     const corpId = process.env.TONGYE_WEWORK_CORP_ID;
     const secret = process.env.TONGYE_WEWORK_SECRET;
-    const openKfId = 'wkKkXdJgAADYkAWa75OYqvUij1lGvpyg';
-    const externalUserId = 'wmKkXdJgAAVx4N53nYCJE0Ebvcl3C25A'; // Snowflake
+    const openKfId = process.env.WECOM_OPEN_KF_ID;
+    const externalUserId = process.env.WECOM_EXTERNAL_USER_ID;
+
+    if (!corpId || !secret || !openKfId || !externalUserId) {
+        throw new Error("Missing required environment variables for diagnosis.");
+    }
 
     const tRes = await axios.get(`https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${corpId}&corpsecret=${secret}`);
     const token = tRes.data.access_token;
@@ -36,12 +35,12 @@ async function run() {
 
     await trySend("Start Diagnostic");
 
-    console.log("\n--- Step 1: Force Transition to State 2 (servicer: QiXi) ---");
+    console.log("\n--- Step 1: Force Transition to State 2 ---");
     const trans1 = await axios.post(`https://qyapi.weixin.qq.com/cgi-bin/kf/service_state/trans?access_token=${token}`, {
-        open_kfid: openKfId, external_userid: externalUserId, service_state: 2, servicer_userid: 'QiXi'
+        open_kfid: openKfId, external_userid: externalUserId, service_state: 2
     });
     console.log("Trans 1 (to 2):", JSON.stringify(trans1.data));
-    await trySend("After State=2 (QiXi)");
+    await trySend("After State=2");
 
     console.log("\n--- Step 2: Try to get state again ---");
     const stateRes2 = await axios.post(`https://qyapi.weixin.qq.com/cgi-bin/kf/service_state/get?access_token=${token}`, {
@@ -54,13 +53,6 @@ async function run() {
         open_kfid: openKfId, external_userid: externalUserId, service_state: 3
     });
     console.log("Trans 2 (to 3):", JSON.stringify(trans2.data));
-
-    console.log("\n--- Step 4: Transition to State 2 (NO servicer) ---");
-    const trans3 = await axios.post(`https://qyapi.weixin.qq.com/cgi-bin/kf/service_state/trans?access_token=${token}`, {
-        open_kfid: openKfId, external_userid: externalUserId, service_state: 2
-    });
-    console.log("Trans 3 (to 2 NO servicer):", JSON.stringify(trans3.data));
-    await trySend("After State=2 (Random)");
 }
 
 run().catch(console.error);

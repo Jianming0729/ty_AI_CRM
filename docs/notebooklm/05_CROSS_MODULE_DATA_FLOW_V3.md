@@ -16,7 +16,7 @@ sequenceDiagram
     U->>B: "What does the full insurance cover?"
     B->>B: Resolve ty_uid
     B->>G: Request completion (sessionId=ty_uid)
-    G->>L: Proxy request to mock-model
+    G->>L: Proxy request to gpt-4o
     L->>KB: Keyword search for "Insurance"
     KB-->>L: Return Policy Chunk #10
     L->>L: Construct response string

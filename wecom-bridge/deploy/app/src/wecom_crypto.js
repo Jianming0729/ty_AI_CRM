@@ -1,64 +1,93 @@
 const { decrypt, encrypt, getSignature } = require('@wecom/crypto');
 const xml2js = require('xml2js');
+const logger = require('./logger');
 
-const token = process.env.WECOM_TOKEN;
-const encodingAESKey = process.env.WECOM_AES_KEY;
-const corpId = process.env.WECOM_CORP_ID;
+// Centralized Config (Loaded from env)
+let WECOM_CONFIG = {
+    token: process.env.WECOM_TOKEN,
+    aesKey: process.env.WECOM_AES_KEY,
+    suiteId: process.env.WECOM_SUITE_ID,
+    corpId: process.env.WECOM_CORP_ID
+};
+
+// Fix AES Key padding if necessary
+if (WECOM_CONFIG.aesKey && WECOM_CONFIG.aesKey.length === 43) {
+    WECOM_CONFIG.aesKey += '=';
+    logger.info('[Crypto] Auto-appended padding to WECOM_AES_KEY.');
+}
 
 module.exports = {
-    /**
-     * 验证回调 URL
-     */
     verifyURL: (signature, timestamp, nonce, echoStr) => {
-        const expectedSignature = getSignature(token, timestamp, nonce, echoStr);
-        console.log(`[Crypto] Token: ${token}, Timestamp: ${timestamp}, Nonce: ${nonce}`);
-        console.log(`[Crypto] EncMsg (first 10): ${echoStr.substring(0, 10)}`);
-        console.log(`[Crypto] Signature: ${signature} vs Expected: ${expectedSignature}`);
+        const expectedSignature = getSignature(WECOM_CONFIG.token, timestamp, nonce, echoStr);
         if (signature !== expectedSignature) {
+            logger.error(`[Crypto] Signature mismatch. Expected: ${expectedSignature}, Got: ${signature}`);
             throw new Error('Invalid signature');
         }
-        const { message, id } = decrypt(encodingAESKey, echoStr);
-        console.log(`[Crypto] Decrypted ID: ${id}`);
-        return message;
+        try {
+            const { message } = decrypt(WECOM_CONFIG.aesKey, echoStr, WECOM_CONFIG.suiteId);
+            return message;
+        } catch (e) {
+            const { message } = decrypt(WECOM_CONFIG.aesKey, echoStr);
+            return message;
+        }
     },
 
-    /**
-     * 解密消息内容
-     */
     decryptMsg: async (signature, timestamp, nonce, xmlData) => {
-        console.log('[Crypto] decryptMsg called');
-        const parser = new xml2js.Parser({ explicitArray: false });
-        const result = await parser.parseStringPromise(xmlData);
-        if (!result || !result.xml) {
-            console.error('[Crypto] Invalid XML structure:', result);
-            throw new Error('Invalid XML structure');
+        if (!xmlData || (typeof xmlData !== 'string' && !Buffer.isBuffer(xmlData))) {
+            throw new Error(`Invalid XML data type: ${typeof xmlData}`);
         }
-        const encryptMsg = result.xml.Encrypt;
-        console.log('[Crypto] EncryptMsg found:', !!encryptMsg);
+        const cleanXml = xmlData.toString().trim().replace(/^\uFEFF/, '');
 
-        const expectedSignature = getSignature(token, timestamp, nonce, encryptMsg);
+        const encryptMatch = cleanXml.match(/<Encrypt><!\[CDATA\[([\s\S]*?)\]\]><\/Encrypt>/i)
+            || cleanXml.match(/<Encrypt>([\s\S]*?)<\/Encrypt>/i);
+
+        if (!encryptMatch) {
+            throw new Error('Could not find <Encrypt> tag in XML');
+        }
+
+        const encryptMsg = encryptMatch[1].replace(/\s/g, '');
+
+        const expectedSignature = getSignature(WECOM_CONFIG.token, timestamp, nonce, encryptMsg);
         if (signature !== expectedSignature) {
-            console.error(`[Crypto] Signature mismatch. Got: ${signature}, Expected: ${expectedSignature}`);
+            logger.error(`[Crypto] Msg Signature mismatch. Expected: ${expectedSignature}, Got: ${signature}`);
             throw new Error('Invalid signature');
         }
 
-        const { message } = decrypt(encodingAESKey, encryptMsg);
-        if (!message) {
-            console.error('[Crypto] Decryption failed, message is empty');
-            throw new Error('Decryption failed');
+        const idsToTry = [WECOM_CONFIG.suiteId, WECOM_CONFIG.corpId, null];
+        let decrypted = null;
+        let lastError = null;
+
+        for (const tid of idsToTry) {
+            try {
+                const res = decrypt(WECOM_CONFIG.aesKey, encryptMsg, tid);
+                if (res.message && res.message.toString().trim().startsWith('<')) {
+                    decrypted = res;
+                    logger.info(`[Crypto] Decrypt SUCCESS with targetId: ${tid}. Resolved ID: ${res.id}`);
+                    break;
+                }
+            } catch (e) {
+                lastError = e;
+            }
         }
-        console.log('[Crypto] Decryption success, parsing interior XML');
-        console.log('[Crypto] RAW Decrypted XML:', message.toString());
-        return parser.parseStringPromise(message.toString());
+
+        if (!decrypted) {
+            logger.error(`[Crypto] Decryption failed all modes. Last error: ${lastError ? lastError.message : 'Unknown'}`);
+            throw new Error('Decryption failed to produce valid XML');
+        }
+
+        const msgStr = decrypted.message.toString();
+        const parser = new xml2js.Parser({ explicitArray: false });
+        try {
+            return await parser.parseStringPromise(msgStr);
+        } catch (xmlErr) {
+            logger.error(`[Crypto] Decrypt output is not valid XML. Content: ${msgStr.substring(0, 100)}`);
+            throw xmlErr;
+        }
     },
 
-    /**
-     * 加密回复消息 (被动回复)
-     */
     encryptMsg: (replyText, fromUser, toUser) => {
         const timestamp = Math.floor(Date.now() / 1000).toString();
         const nonce = Math.random().toString(36).substring(2, 15);
-
         const xmlContent = `
         <xml>
             <ToUserName><![CDATA[${toUser}]]></ToUserName>
@@ -67,10 +96,8 @@ module.exports = {
             <MsgType><![CDATA[text]]></MsgType>
             <Content><![CDATA[${replyText}]]></Content>
         </xml>`;
-
-        const encryptMsg = encrypt(encodingAESKey, xmlContent, corpId);
-        const signature = getSignature(token, timestamp, nonce, encryptMsg);
-
+        const encryptMsg = encrypt(WECOM_CONFIG.aesKey, xmlContent, WECOM_CONFIG.corpId);
+        const signature = getSignature(WECOM_CONFIG.token, timestamp, nonce, encryptMsg);
         return `
         <xml>
             <Encrypt><![CDATA[${encryptMsg}]]></Encrypt>

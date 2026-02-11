@@ -63,7 +63,7 @@ def chat():
         def generate():
             resp_id = f"resp_{int(time.time())}"
             created_at = int(time.time())
-            model = data.get("model", "mock-model")
+            model = data.get("model", "gpt-4o")
             
             # response.created
             yield f"data: {{\"type\": \"response.created\", \"response\": {{\"id\": \"{resp_id}\", \"object\": \"response\", \"created_at\": {created_at}, \"status\": \"in_progress\", \"model\": \"{model}\", \"output\": [], \"usage\": {{\"input_tokens\": 0, \"output_tokens\": 0, \"total_tokens\": 0}}}}}}\n\n"
@@ -88,7 +88,7 @@ def chat():
         "object": "response",
         "created_at": int(time.time()),
         "status": "completed",
-        "model": data.get("model", "mock-model"),
+        "model": data.get("model", "gpt-4o"),
         "output": [
             {
                 "type": "message",

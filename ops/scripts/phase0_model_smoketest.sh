@@ -7,7 +7,7 @@ export OPENCLAW_GATEWAY_TOKEN=9cb28ba9a404b65e797b21e5de95e88807709491dabba8c6
 echo "--- STEP 1: Testing Mock Provider directly ---"
 curl -s -X POST http://localhost:8000/v1/responses \
   -H "Content-Type: application/json" \
-  -d '{"model": "mock-model", "input": [{"role": "user", "content": "hello"}], "stream": false}' | grep "Mock"
+  -d '{"model": "gpt-4o", "input": [{"role": "user", "content": "hello"}], "stream": false}' | grep "Mock"
 
 if [ $? -eq 0 ]; then
     echo "✅ Mock Provider is ALIVE"

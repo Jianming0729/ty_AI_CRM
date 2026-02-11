@@ -13,7 +13,7 @@ module.exports = {
         try {
             // 直接访问 Mock Provider (OpenAI 兼容格式)
             const response = await axios.post(`${gatewayUrl}/v1/chat/completions`, {
-                model: "openai/mock-model",
+                model: "openai/gpt-4o",
                 messages: [
                     { role: "user", content: message }
                 ],

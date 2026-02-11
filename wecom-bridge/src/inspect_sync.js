@@ -1,8 +1,18 @@
+// --- 🛰️ Architecture Circuit Breaker ---
+require('./bootstrap')();
+
 const axios = require('axios');
+
 async function run() {
-    const corpId = 'wwcc13ff6e75e81173';
-    const secret = 'DDL6MI_cm2XZVcXcV33i2RkjbBCFIWiY2g3jIDp7Tek';
-    const openKfId = 'wkKkXdJgAADYkAWa75OYqvUij1lGvpyg';
+    console.log("🚀 Starting inspect_sync with V3 Configuration...");
+
+    const corpId = process.env.TONGYE_WEWORK_CORP_ID;
+    const secret = process.env.TONGYE_WEWORK_SECRET;
+    const openKfId = process.env.WECOM_OPEN_KF_ID;
+
+    if (!corpId || !secret || !openKfId) {
+        throw new Error("Missing required environment variables for inspection.");
+    }
 
     const tRes = await axios.get(`https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${corpId}&corpsecret=${secret}`);
     const token = tRes.data.access_token;
@@ -16,9 +26,14 @@ async function run() {
             cursor, limit: 10, open_kfid: openKfId
         });
         lastData = res.data;
-        cursor = lastData.next_cursor;
+        if (lastData.errcode !== 0) {
+            console.error("Sync Error:", lastData);
+            break;
+        }
+        cursor = lastData.next_cursor || '';
         hasMore = lastData.has_more === 1;
+        if (!cursor) break;
     }
     console.log(JSON.stringify(lastData, null, 2));
 }
-run();
+run().catch(console.error);

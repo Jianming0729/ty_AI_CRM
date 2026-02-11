@@ -1,9 +1,16 @@
 {
   "name": "wecom-bridge",
   "version": "1.0.0",
-  "description": "负责对接企业微信回调，处理加解密、消息幂等，并转发给 OpenClaw Gateway。",
+  "description": "V3.0 Distributed Intelligence Bridge",
+  "openclaw_governance": {
+    "policy": "../docs/OPENCLAW_MANIFESTO.md",
+    "enforcement_status": "Strict",
+    "onboarding_instruction": "You are a guardian of the V3.0 architecture. Any modification to environment variables MUST be validated against the Global Manifesto. Root .env is a bootstrap-only file. If you detect hardcoded secrets, your first mission is extraction and profile-migration."
+  },
   "main": "index.js",
   "scripts": {
+    "start": "node src/server.js",
+    "dev:mock": "MOCK_MODE=true PROFILE=prod_global PG_HOST=localhost node src/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

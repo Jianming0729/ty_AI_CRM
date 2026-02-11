@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer 360 | ty_AI_CRM</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1f93ff;
+            --primary-glow: rgba(31, 147, 255, 0.15);
+            --bg: #151921;
+            --card-bg: rgba(21, 25, 33, 0.7);
+            --border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-dim: #8ba3ad;
+            --accent: #00d1ff;
+            --success: #2dd482;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            background-image:
+                radial-gradient(circle at 0% 0%, rgba(31, 147, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, rgba(0, 209, 255, 0.08) 0%, transparent 40%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            perspective: 1000px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: cardEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes cardEntrance {
+            from {
+                opacity: 0;
+                transform: translateY(30px) rotateX(-5deg);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) rotateX(0);
+            }
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 32px;
+        }
+
+        .profile-info h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            background: var(--primary-glow);
+            border: 1px solid rgba(37, 99, 235, 0.3);
+            border-radius: 100px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+            margin-left: 12px;
+        }
+
+        .asset-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px dashed var(--border);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 32px;
+            display: flex;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .asset-box:hover {
+            border-color: var(--primary);
+            background: var(--primary-glow);
+        }
+
+        .plate-icon {
+            font-size: 24px;
+            margin-right: 16px;
+        }
+
+        .plate-number {
+            font-family: 'Outfit', sans-serif;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+        }
+
+        .maintenance-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .maintenance-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .maintenance-item:hover {
+            transform: scale(1.02);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .m-info b {
+            display: block;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+
+        .m-info span {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .m-date {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            color: var(--accent);
+            font-weight: 500;
+            background: rgba(56, 189, 248, 0.1);
+            padding: 4px 10px;
+            border-radius: 8px;
+        }
+
+        .loading-pulse {
+            height: 20px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+            background-size: 200% 100%;
+            animation: pulse 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes pulse {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        footer {
+            margin-top: 32px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 24px;
+            transition: opacity 0.5s ease;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            font-size: 14px;
+            color: var(--text-dim);
+            font-weight: 500;
+            letter-spacing: 0.05em;
+        }
+    </style>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+</head>
+
+<body>
+    <div class="container">
+        <div class="card" id="card" style="position: relative;">
+            <div id="loading-overlay" class="loading-overlay">
+                <div class="spinner"></div>
+                <div class="loading-text">同步数据中...</div>
+            </div>
+            <header>
+                <div class="profile-info">
+                    <h1 id="handle">
+                        <div class="loading-pulse" style="width: 150px"></div>
+                    </h1>
+                    <div id="uid" style="font-size: 12px; color: var(--text-dim);">ID: ...</div>
+                </div>
+                <div class="badge-group" style="display: flex; gap: 8px;">
+                    <div class="badge" id="session-badge" style="display: none;">
+                        <div class="status-dot" style="background: var(--accent); box-shadow: 0 0 10px var(--accent);">
+                        </div>
+                        <span>SESSION ACTIVE</span>
+                    </div>
+                    <div class="badge">
+                        <div class="status-dot"></div>
+                        <span id="status">SYNCING...</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="section-title">核心资产 (Primary Asset)</div>
+            <div class="asset-box">
+                <div class="plate-icon">🚗</div>
+                <div class="plate-number" id="license-plate">
+                    <div class="loading-pulse" style="width: 120px"></div>
+                </div>
+            </div>
+
+            <div class="section-title">维保履历 (Maintenance Timeline)</div>
+            <div class="maintenance-list" id="maintenance-list">
+                <!-- Data injected here -->
+                <div class="maintenance-item" style="opacity: 0.5;">
+                    <div class="m-info">
+                        <div class="loading-pulse" style="width: 200px; margin-bottom: 8px;"></div>
+                        <div class="loading-pulse" style="width: 100px"></div>
+                    </div>
+                </div>
+            </div>
+
+            <footer>
+                Powered by OpenClaw L3-Sandbox & Antigravity
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 解析 URL 参数 (例如: c360.html?uid=U-001&token=...)
+            const urlParams = new URLSearchParams(window.location.search);
+            let tyUid = urlParams.get('uid');
+            const contactId = urlParams.get('contact_id');
+            const tyToken = urlParams.get('token');
+
+            console.log(`[C360-Init] Capturing UID: ${tyUid || 'NONE'}, ContactID: ${contactId || 'NONE'}, Token: ${tyToken ? 'PRESENT' : 'MISSING'}`);
+
+            if (tyToken) {
+                console.log(`[C360-Init] Token Validation Hash: ${tyToken.substring(0, 8)}...`);
+                document.getElementById('session-badge').style.display = 'inline-flex';
+            }
+
+            const renderProfile = (uid) => {
+                const API_URL = `/api/customer360/v1/profile/${uid}`;
+
+                fetch(API_URL, {
+                    headers: {
+                        'X-CW-Signature': tyToken || 'mock_api_token'
+                    }
+                })
+                    .then(res => {
+                        if (res.status === 403) throw new Error('Security Handshake Failed (403)');
+                        if (!res.ok) throw new Error('API Sync Failed');
+                        return res.json();
+                    })
+                    .then(data => {
+                        // 隐藏加载状态
+                        document.getElementById('loading-overlay').style.opacity = '0';
+                        setTimeout(() => {
+                            document.getElementById('loading-overlay').style.display = 'none';
+                        }, 500);
+                        // 1. 身份渲染
+                        document.getElementById('handle').innerText = data.identity.handle;
+                        document.getElementById('uid').innerText = `TY_UID: ${data.identity.ty_uid}`;
+                        document.getElementById('status').innerText = 'CONNECTED';
+
+                        // 2. 资产渲染
+                        const plate = data.assets.license_plates[0] || '未绑定车牌';
+                        document.getElementById('license-plate').innerText = plate;
+
+                        // 3. 维保记录渲染
+                        const list = document.getElementById('maintenance-list');
+                        list.innerHTML = ''; // 清空 Skeleton
+
+                        if (data.maintenance && data.maintenance.length > 0) {
+                            data.maintenance.forEach(m => {
+                                const item = document.createElement('div');
+                                item.className = 'maintenance-item';
+                                item.innerHTML = `
+                                <div class="m-info">
+                                    <b>${m.maintain_item}</b>
+                                    <span>下次保养预估: ${m.next_maintain_km.toLocaleString()} KM</span>
+                                </div>
+                                <div class="m-date">${m.start_time}</div>
+                            `;
+                                list.appendChild(item);
+                            });
+                        } else {
+                            list.innerHTML = '<div style="text-align:center; padding: 20px; color: var(--text-dim);">无历史记录</div>';
+                        }
+
+                        console.log('✅ Customer 360 View Synchronized.');
+                    })
+                    .catch(err => {
+                        console.error('❌ Sync Error:', err);
+                        document.getElementById('loading-overlay').style.display = 'none';
+                        document.getElementById('handle').innerText = 'Sync Error';
+
+                        let errorMsg = '无法连接至数据中枢 (Port 3001)。<br>请确保 wecom-bridge 已启动。';
+                        if (err.message.includes('403')) {
+                            errorMsg = '🔐 安全握手失败 (403)。<br>URL 令牌无效或 X-CW-Signature 校验未通过。';
+                        }
+
+                        document.getElementById('maintenance-list').innerHTML =
+                            `<div style="color: #ef4444; text-align: center; padding: 20px;">
+                            ${errorMsg}
+                         </div>`;
+                    });
+            };
+
+            // 逻辑闸门：如果只有 Chatwoot Contact ID，需先反查 ty_uid
+            if (!tyUid && contactId) {
+                console.log(`[C360-Identity] Resolving ty_uid from Chatwoot contact_id: ${contactId}`);
+                document.querySelector('.loading-text').innerText = '正在解析身份映射...';
+
+                fetch(`/api/identity/v1/chatwoot/resolve-by-contact?contact_id=${contactId}`)
+                    .then(res => {
+                        if (!res.ok) throw new Error('Identity breakdown');
+                        return res.json();
+                    })
+                    .then(result => {
+                        console.log(`[C360-Identity] Resolved UID: ${result.ty_uid}`);
+                        tyUid = result.ty_uid;
+                        renderProfile(tyUid);
+                    })
+                    .catch(err => {
+                        console.error('❌ Resolution Error:', err);
+                        document.getElementById('loading-overlay').style.display = 'none';
+                        document.getElementById('handle').innerText = 'Identity Error';
+                        document.getElementById('maintenance-list').innerHTML =
+                            `<div style="color: #ef4444; text-align: center; padding: 20px;">
+                                ⚠️ 身份映射未找到。此联系人可能尚未同步至 ty_identity。<br>
+                                Contact ID: ${contactId}
+                             </div>`;
+                    });
+            } else {
+                // 如果已有 uid 或 降级为默认
+                renderProfile(tyUid || 'U-001');
+            }
+        });
+    </script>
+</body>
+
+</html>
